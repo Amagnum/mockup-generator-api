@@ -102,8 +102,12 @@ class MockupService:
         if len(source_mask_img_original.shape) == 3:
             # If mask has multiple channels (RGB or RGBA)
             if source_mask_img_original.shape[2] == 4:
-                # If it has an alpha channel, use that as the mask
-                source_mask_img = source_mask_img_original[:, :, 3]
+                # Convert RGB to grayscale, ignoring alpha
+                source_mask_img = cv2.cvtColor(source_mask_img_original[:, :, :3], cv2.COLOR_BGR2GRAY)
+                # Get alpha channel and create mask where alpha is 0 (transparent)
+                alpha_mask = source_mask_img_original[:, :, 3] == 0
+                # Set transparent areas to black (0) in the grayscale image
+                source_mask_img[alpha_mask] = 0
             else:
                 # Convert RGB to grayscale
                 source_mask_img = cv2.cvtColor(source_mask_img_original, cv2.COLOR_BGR2GRAY)

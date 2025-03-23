@@ -1,0 +1,16 @@
+output/
+__pycache__/
+uploads/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.ico

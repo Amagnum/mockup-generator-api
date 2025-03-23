@@ -103,7 +103,7 @@ class CVMockupGenerator(MockupGenerator):
         D_box = (D_box - D_box.min()) / (D_box.max() - D_box.min() + 1e-6)  # Normalize to [0,1]
 
         # Step 4: Warp Design Using Depth
-        k = 3.0  # Bending strength
+        k = 1.0  # Bending strength
         Dy, Dx = np.gradient(D_box)
         sx = 1 / (1 + k * np.abs(Dx))
         sy = 1 / (1 + k * np.abs(Dy))

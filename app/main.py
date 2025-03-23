@@ -49,6 +49,7 @@ async def generate_mockup(
     scale_factor: float = Form(0.5),
     shading_strength: float = Form(0.7),
     color_mode: str = Form("auto"),
+    session_id: Optional[str] = Form(None),
     mockup_service: MockupService = Depends(get_mockup_service)
 ):
     """
@@ -64,10 +65,11 @@ async def generate_mockup(
     - **scale_factor**: Scale factor for the design (default: 0.5)
     - **shading_strength**: Strength of shading effect (0-1, default: 0.7)
     - **color_mode**: Color application mode: 'auto', 'light', or 'dark' (default: auto)
+    - **session_id**: Optional session ID to update the same image across requests
     """
     try:
-        # Generate a unique ID for this mockup
-        mockup_id = str(uuid.uuid4())
+        # Use provided session_id or generate a new unique ID for this mockup
+        mockup_id = session_id if session_id else str(uuid.uuid4())
         
         # Process the mockup
         result = await mockup_service.generate_mockup(
