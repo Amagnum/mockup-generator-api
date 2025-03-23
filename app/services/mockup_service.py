@@ -60,6 +60,37 @@ class MockupService:
         self.logger.debug(f"Resized image from {(w, h)} to {(target_w, target_h)}")
         return resized
     
+    @debug_exception
+    def _ensure_rgba(self, image: np.ndarray, image_name: str) -> np.ndarray:
+        """Convert image to RGBA format regardless of input format"""
+        self.logger.debug(f"Ensuring {image_name} is in RGBA format. Current shape: {image.shape}, dtype: {image.dtype}")
+        
+        # Handle grayscale images (2D arrays)
+        if len(image.shape) == 2:
+            self.logger.debug(f"Converting grayscale {image_name} to RGBA")
+            # Convert grayscale to BGR
+            bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            # Add alpha channel (fully opaque)
+            alpha = np.ones(image.shape, dtype=image.dtype) * 255
+            return cv2.merge((bgr[:, :, 0], bgr[:, :, 1], bgr[:, :, 2], alpha))
+        
+        # Handle BGR images (3 channels)
+        elif len(image.shape) == 3 and image.shape[2] == 3:
+            self.logger.debug(f"Converting BGR {image_name} to RGBA")
+            # Add alpha channel (fully opaque)
+            alpha = np.ones((image.shape[0], image.shape[1]), dtype=image.dtype) * 255
+            return cv2.merge((image[:, :, 0], image[:, :, 1], image[:, :, 2], alpha))
+        
+        # Handle BGRA images (4 channels)
+        elif len(image.shape) == 3 and image.shape[2] == 4:
+            self.logger.debug(f"{image_name} is already in RGBA format")
+            return image
+        
+        # Handle other unexpected formats
+        else:
+            self.logger.error(f"Unsupported image format for {image_name}: shape={image.shape}")
+            raise ValueError(f"Unsupported image format for {image_name}")
+    
     @debug_timing
     @debug_exception
     @debug_function_args
@@ -146,16 +177,23 @@ class MockupService:
         _, source_mask_img = cv2.threshold(source_mask_img, 127, 255, cv2.THRESH_BINARY)
         save_debug_image(source_mask_img, f"{mockup_id}_05_mask_processed", mockup_id)
         
-        # Check if design has alpha channel, add one if not
-        if len(design_img.shape) == 3 and design_img.shape[2] == 3:
-            # Convert BGR to BGRA by adding an alpha channel
-            self.logger.debug("Adding alpha channel to design image")
-            alpha = np.ones((design_img.shape[0], design_img.shape[1]), dtype=design_img.dtype) * 255
-            design_img = cv2.merge((design_img[:, :, 0], design_img[:, :, 1], design_img[:, :, 2], alpha))
-            save_debug_image(design_img, f"{mockup_id}_06_design_with_alpha", mockup_id)
-        elif len(design_img.shape) != 3 or design_img.shape[2] != 4:
-            self.logger.error(f"Invalid design image format: shape={design_img.shape}")
-            raise ValueError("Design image must be a color image with an alpha channel")
+        # Ensure all images are in RGBA format
+        source_img = self._ensure_rgba(source_img, "source image")
+        save_debug_image(source_img, f"{mockup_id}_05a_source_rgba", mockup_id)
+        
+        # Depth map should remain grayscale for proper processing
+        if len(source_depth_img.shape) == 3:
+            if source_depth_img.shape[2] == 4:  # RGBA
+                self.logger.debug("Converting depth map from RGBA to grayscale")
+                source_depth_img = cv2.cvtColor(source_depth_img[:, :, :3], cv2.COLOR_BGR2GRAY)
+            else:  # BGR
+                self.logger.debug("Converting depth map from BGR to grayscale")
+                source_depth_img = cv2.cvtColor(source_depth_img, cv2.COLOR_BGR2GRAY)
+        save_debug_image(source_depth_img, f"{mockup_id}_05b_depth_processed", mockup_id)
+        
+        # Ensure design image is RGBA
+        design_img = self._ensure_rgba(design_img, "design image")
+        save_debug_image(design_img, f"{mockup_id}_06_design_rgba", mockup_id)
         
         # Convert hex color to RGB
         rgb_color = self._hex_to_rgb(color_code)
