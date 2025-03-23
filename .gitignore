@@ -1,11 +1,15 @@
 output/
 __pycache__/
 uploads/
+debug/
+*.log
+
 *.pyc
 *.pyo
 *.pyd
 *.pyw
 *.pyz
+*.pyc
 
 *.png
 *.jpg
