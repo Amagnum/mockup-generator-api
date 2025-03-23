@@ -33,7 +33,9 @@ class CVMockupGenerator(MockupGenerator):
         location: Tuple[int, int],
         scale_factor: float,
         shading_strength: float = 1.0,
-        color_mode: str = 'auto'
+        color_mode: str = 'auto',
+        color_method: str = 'standard',
+        color_config: Dict[str, Any] = None
     ) -> np.ndarray:
         """
         Generate a t-shirt mockup with a design placed at a 2D location, bent using a 16-bit depth map.
@@ -48,6 +50,8 @@ class CVMockupGenerator(MockupGenerator):
         - scale_factor: Float to scale the design size.
         - shading_strength: Float (0 to 1) to control shading intensity on the design.
         - color_mode: String, one of 'auto', 'light', or 'dark' to control color application method.
+        - color_method: String, one of 'standard' or 'intrinsic' to select coloring algorithm.
+        - color_config: Dictionary with parameters to control the recoloring process.
 
         Returns:
         - final_image: BGR image with colored t-shirt and design applied.
@@ -60,12 +64,14 @@ class CVMockupGenerator(MockupGenerator):
         self._validate_inputs(source_image, source_mask, source_depth, design_image)
         
         # Step 1: Change T-shirt Color
-        self.logger.debug("Step 1: Applying t-shirt color")
+        self.logger.debug(f"Step 1: Applying t-shirt color using method: {color_method}")
         colored_tshirt_image = self.color_handler.apply_tshirt_color(
             source_image, 
             source_mask, 
             color_code, 
-            color_mode
+            color_mode,
+            method=color_method,
+            config=color_config
         )
         save_debug_image(colored_tshirt_image, f"{debug_id}_1_colored_tshirt")
         

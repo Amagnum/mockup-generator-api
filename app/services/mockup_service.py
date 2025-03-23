@@ -105,7 +105,9 @@ class MockupService:
         location: Tuple[int, int],
         scale_factor: float,
         shading_strength: float = 0.7,
-        color_mode: str = 'auto'
+        color_mode: str = 'auto',
+        color_method: str = 'standard',
+        color_config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Process uploaded files and generate a mockup"""
         self.logger.info(f"Starting mockup generation for ID: {mockup_id}")
@@ -210,7 +212,9 @@ class MockupService:
                 location=location,
                 scale_factor=scale_factor,
                 shading_strength=shading_strength,
-                color_mode=color_mode
+                color_mode=color_mode,
+                color_method=color_method,
+                color_config=color_config
             )
             save_debug_image(result_image, f"{mockup_id}_07_final_result", mockup_id)
         except Exception as e:
