@@ -6,6 +6,7 @@ from app.interfaces.mockup_generator import MockupGenerator
 from app.utils.logging_config import get_logger
 from app.utils.debug_utils import save_debug_image, debug_timing, debug_exception, debug_function_args
 
+from app.implementations.mockup.color_handler_v3 import ColorHandlerV3
 from app.implementations.mockup.color_handler import ColorHandler
 from app.implementations.mockup.design_placer import DesignPlacer
 from app.implementations.mockup.design_warper import DesignWarper
@@ -17,6 +18,7 @@ class CVMockupGenerator(MockupGenerator):
     def __init__(self):
         self.logger = get_logger(__name__)
         self.color_handler = ColorHandler()
+        # self.color_handler = ColorHandlerV3()
         self.design_placer = DesignPlacer()
         self.design_warper = DesignWarper()
         self.compositor = Compositor()

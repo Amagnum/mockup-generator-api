@@ -113,7 +113,7 @@ class ColorHandler:
         mask = source_mask > 0
         
         # Detect if the source t-shirt is black or white
-        base_color = self.detect_tshirt_base_color(source_image, source_mask)
+        base_color = 'white' #self.detect_tshirt_base_color(source_image, source_mask)
         self.logger.debug(f"Using {base_color} t-shirt as base for coloring")
         
         if method == 'int-v2':
@@ -277,175 +277,102 @@ class ColorHandler:
         source_image: np.ndarray,
         mask: np.ndarray,
         color_code: Tuple[int, int, int],
-        config: Dict[str, Any] = None
+        config: dict = None
     ) -> np.ndarray:
-        """Apply color using enhanced intrinsic image decomposition for black t-shirts.
-        
-        This method is specifically designed for black or dark t-shirts, using an inverted
-        approach to extract highlights and texture details from dark fabrics.
-        
-        Args:
-            source_image: Original image (BGR format)
-            mask: Boolean mask of the t-shirt area
-            color_code: RGB color tuple (R, G, B)
-            config: Optional dictionary with parameters to control the recoloring
-            
-        Returns:
-            Recolored image with enhanced texture preservation for dark base fabrics
         """
-        self.logger.debug("Applying color using enhanced intrinsic decomposition for black t-shirts")
-        
-        # Set default configuration parameters for black t-shirts
-        default_config = {
-            'large_scale_blur': 21,
-            'medium_scale_blur': 7,
-            'fine_scale_blur': 3,
-            'large_scale_weight': 0.7,
-            'medium_scale_weight': 1.5,
-            'fine_scale_weight': 2.0,
-            'highlight_boost': 1.5,        # Boost highlights in dark fabrics
-            'shadow_compression': 0.7,     # Compress shadows to prevent too dark areas
-            'base_detail_preservation': 0.2,
-            'texture_detail_weight': 0.3,
-            'saturation_influence': 0.25,
-            'highlight_threshold': 0.4,    # Threshold to identify highlights in dark fabric
-            'inversion_strength': 0.8,     # How strongly to invert the luminance for processing
-            'color_intensity': 1.2         # Intensity of the target color (higher = more vibrant)
-        }
-        
-        # Use provided config or defaults
+        Recolor a black t-shirt image while preserving texture and shading.
+
+        Args:
+            source_image: Input image in BGR format (numpy array).
+            mask: Boolean mask where True indicates the t-shirt area.
+            color_code: Target color as RGB tuple (e.g., (255, 255, 255) for white).
+            config: Optional settings (e.g., blur sizes, weights, texture preservation).
+
+        Returns:
+            Recolored image in BGR format.
+        """
+        # Default configuration
         if config is None:
-            config = {}
-        
-        # Merge with defaults
-        for key, value in default_config.items():
-            if key not in config:
-                config[key] = value
-        
-        # Create a copy of the source image
+            config = {
+                'large_scale_blur': 21,      # For broad shading
+                'fine_scale_blur': 3,        # For fine texture
+                'texture_boost': 3.0,        # Amplify texture details
+                'shading_boost': 1.5,        # Enhance shading contrast
+                'min_brightness': 0.1,       # Minimum brightness for black target
+                'max_brightness': 0.9,       # Maximum brightness for white target
+                'texture_preservation': 0.7,  # How much texture to preserve
+                'detail_enhancement': 2.0    # Enhance fine details
+            }
+
+        # Copy the image and convert to RGB for processing
         colored_image = source_image.copy()
         
         # Convert BGR to RGB for processing
         rgb_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2RGB)
-        
-        # Convert to float for calculations
         rgb_float = rgb_image.astype(np.float32) / 255.0
+
+        # Compute luminance (grayscale) for shading
+        luminance = np.dot(rgb_float[..., :3], [0.299, 0.587, 0.114])
         
-        # Calculate base luminance using perceptual weights
-        base_luminance = np.dot(rgb_float[..., :3], [0.299, 0.587, 0.114])
-        
-        # For black t-shirts, we need to invert the luminance to better extract details
-        # This helps identify highlights and texture in dark fabrics
-        inverted_luminance = 1.0 - base_luminance
-        
-        # Blend original and inverted luminance based on inversion strength
-        # This preserves some of the original shading while enhancing details
-        processed_luminance = (inverted_luminance * config['inversion_strength'] + 
-                              base_luminance * (1.0 - config['inversion_strength']))
-        
-        # Ensure luminance is properly formatted for OpenCV operations
-        luminance_img = processed_luminance.astype(np.float32)
-        
-        # Multi-scale decomposition for better texture/shading separation
-        # Create a blurred version for large-scale shading
+        # Extract texture details at different scales
         large_kernel = config['large_scale_blur']
         if large_kernel % 2 == 0:  # Ensure kernel size is odd
             large_kernel += 1
-        blurred = cv2.GaussianBlur(luminance_img, (large_kernel, large_kernel), 0)
-        
-        # Extract medium details
-        medium_kernel = config['medium_scale_blur']
-        if medium_kernel % 2 == 0:
-            medium_kernel += 1
-        medium_details = cv2.GaussianBlur(luminance_img, (medium_kernel, medium_kernel), 0) - blurred
-        
-        # Extract fine details (high frequency)
+            
         fine_kernel = config['fine_scale_blur']
-        if fine_kernel % 2 == 0:
+        if fine_kernel % 2 == 0:  # Ensure kernel size is odd
             fine_kernel += 1
-        fine_details = luminance_img - cv2.GaussianBlur(luminance_img, (fine_kernel, fine_kernel), 0)
         
-        # Create a highlight mask to identify areas that should be brighter
-        highlight_mask = base_luminance > config['highlight_threshold']
+        # Large-scale shading (smooth lighting variations)
+        large_scale = cv2.GaussianBlur(luminance, (large_kernel, large_kernel), 0)
         
-        # Combine into enhanced shading map with detail preservation
-        shading = blurred * config['large_scale_weight'] + \
-                 medium_details * config['medium_scale_weight'] + \
-                 fine_details * config['fine_scale_weight']
+        # Fine-scale details (wrinkles, folds, texture)
+        fine_details = luminance - cv2.GaussianBlur(luminance, (fine_kernel, fine_kernel), 0)
         
-        # Boost highlights in the fabric
-        if np.any(highlight_mask):
-            shading[highlight_mask] *= config['highlight_boost']
+        # Enhance fine details to make them more visible
+        enhanced_details = fine_details * config['detail_enhancement']
         
-        # Compress shadows to prevent too dark areas
-        shading = 1.0 - ((1.0 - shading) * config['shadow_compression'])
+        # Combine into a shading map
+        shading = large_scale + enhanced_details
         
-        # Ensure shading is within valid range
-        shading = np.clip(shading, 0.1, 1.0)
-        
-        # Calculate local texture complexity for adaptive blending
-        texture_complexity = np.abs(cv2.Laplacian(luminance_img, cv2.CV_32F, ksize=3))
-        texture_complexity = cv2.GaussianBlur(texture_complexity, (5, 5), 0)
-        
-        # Normalize texture complexity
-        if texture_complexity.max() > 0:  # Avoid division by zero
-            texture_complexity = np.clip(texture_complexity / texture_complexity.max(), 0, 1)
-        else:
-            texture_complexity = np.zeros_like(texture_complexity)
-        
-        # Convert target RGB color to BGR for OpenCV
-        target_bgr = (color_code[2], color_code[1], color_code[0])
-        
-        # Calculate color saturation for adaptive blending
-        color_hsv = cv2.cvtColor(np.uint8([[color_code]]), cv2.COLOR_RGB2HSV)[0][0]
-        color_saturation = color_hsv[1] / 255.0  # Normalize to [0,1]
-        
-        # Create a color layer with the target color
-        color_layer = np.zeros_like(source_image, dtype=np.float32)
-        for c in range(3):
-            color_layer[..., c] = target_bgr[c] * config['color_intensity']
-        
-        # Apply color with enhanced texture preservation
-        for c in range(3):  # BGR channels
-            # Calculate adaptive blend factor (higher for complex textures)
-            detail_preservation = config['base_detail_preservation'] + (
-                config['texture_detail_weight'] * texture_complexity[mask]
-            )
+        # Normalize shading within the mask to [0, 1]
+        if np.any(mask):  # Check if mask is not empty
+            shading_mask = shading[mask]
+            min_val, max_val = np.min(shading_mask), np.max(shading_mask)
+            if max_val > min_val:
+                normalized_shading = (shading - min_val) / (max_val - min_val)
+            else:
+                normalized_shading = np.ones_like(shading)
+                
+            # Apply shading boost to increase contrast
+            boosted_shading = np.power(normalized_shading, 1.0/config['shading_boost'])
             
-            # Adjust based on color saturation (more saturated colors need less detail preservation)
-            detail_preservation *= (1.0 - (color_saturation * config['saturation_influence']))
+            # Determine target color brightness (0 for black, 1 for white)
+            target_brightness = sum(color_code) / (3 * 255.0)
             
-            # For black t-shirts, we use a different blending approach:
-            # 1. Start with the target color
-            # 2. Modulate it by the shading map to preserve highlights and shadows
-            # 3. Blend in some of the original texture details
+            # Prepare target color in BGR (OpenCV format)
+            target_bgr = (color_code[2], color_code[1], color_code[0])  # RGB to BGR
             
-            # Apply the target color modulated by shading
-            colored_image[mask, c] = np.clip(
-                color_layer[mask, c] * shading[mask],
-                0,
-                255
-            ).astype(np.uint8)
+            # FIX: For black t-shirts, we need to maintain the original shading direction
+            # Lighter areas in the source should remain lighter in the result
+            # Darker areas in the source should remain darker in the result
             
-            # Blend in original texture details
-            # For dark fabrics, we need to be careful not to bring back too much of the original dark color
-            # We'll use a more selective approach to preserve only the texture variations
+            # Adjust shading range based on target color
+            if target_brightness > 0.5:  # For light colors (like white)
+                # For light target colors: map the full range of source shading to a bright range
+                adjusted_shading = config['min_brightness'] + boosted_shading * (config['max_brightness'] - config['min_brightness'])
+            else:  # For dark colors (like black)
+                # For dark target colors: map the full range of source shading to a darker range
+                # but maintain the same direction (lighter source = lighter result)
+                adjusted_shading = config['min_brightness'] + boosted_shading * (config['max_brightness'] - config['min_brightness'])
+                # Scale down the brightness for darker target colors
+                adjusted_shading *= (target_brightness * 2.0)  # Scale factor based on target brightness
             
-            # Extract texture variations from the original image
-            original_texture = source_image[mask, c].astype(np.float32)
-            
-            # Normalize the texture to center around zero
-            mean_texture = np.mean(original_texture)
-            centered_texture = original_texture - mean_texture
-            
-            # Scale the texture variations based on detail preservation
-            scaled_texture = centered_texture * detail_preservation * 0.5
-            
-            # Add the texture variations to the colored image
-            colored_image[mask, c] = np.clip(
-                colored_image[mask, c].astype(np.float32) + scaled_texture,
-                0,
-                255
-            ).astype(np.uint8)
+            # Apply color with texture preservation
+            for c in range(3):
+                colored_image[mask, c] = np.clip(
+                    target_bgr[c] * adjusted_shading[mask],
+                    0, 255
+                ).astype(np.uint8)
         
-        return colored_image 
+        return colored_image
