@@ -28,3 +28,21 @@ Replace FastAPI endpoints with Django views
 3. Replace FastAPI dependency injection with Django's dependency injection or a custom solution
 Adapt the request/response handling to Django's patterns
 The core business logic in the services and implementations would remain largely unchanged.
+
+
+Running Tests
+
+How to Run the Tests
+To run these tests, you'll need to install pytest and the FastAPI test client:
+```
+pip install pytest pytest-cov httpx
+```
+Then you can run the tests with:
+```
+pytest tests/
+```
+Or with coverage reporting:
+```
+pytest --cov=app --cov-report=term-missing tests/
+```
+
