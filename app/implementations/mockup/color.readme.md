@@ -360,3 +360,6 @@ The `int-v2` method is more computationally intensive than the standard methods 
    - Increase `shading_boost`
    - Decrease `min_shading`
    - Increase weights for all scale levels
+
+
+{ "min_shading":0.001, "shading_boost": 1.3, "large_scale_weight": 0.7, "medium_scale_weight": 1.3, "fine_scale_weight": 1.8, "base_detail_preservation": 0.3, "texture_detail_weight": 0.5, "saturation_influence": 0.5 }
