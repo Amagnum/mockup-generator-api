@@ -3,6 +3,7 @@ __pycache__/
 app/implementations/__pycache__/
 uploads/
 debug/
+node_modules/
 *.log
 
 *.pyc

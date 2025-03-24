@@ -16,6 +16,7 @@ def save_debug_image(image, name, session_id=None):
     if image is None:
         return
     
+    return
     # Create session directory if provided
     if session_id:
         session_dir = debug_dir / session_id
